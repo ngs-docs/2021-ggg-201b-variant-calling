@@ -6,3 +6,4 @@ channels:
 dependencies:
   - snakemake-minimal=5.30.1
   - wget
+  - samtools=1.10
