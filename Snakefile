@@ -1,37 +1,59 @@
+# default rule that tells snakemake to create the .vcf file if
+# it is not run with any specific rule or file request.
+rule all:
+    input:
+        "SRR2584857_1.ecoli-rel606.vcf"
+
 rule download_data:
     conda: "env-wget.yml"
+    output: "SRR2584857_1.fastq.gz"
     shell: """
-        wget https://osf.io/4rdza/download -O SRR2584857_1.fastq.gz
+        wget https://osf.io/4rdza/download -O {output}
     """
 
 rule download_genome:
     conda: "env-wget.yml"
+    output: "ecoli-rel606.fa.gz"
     shell:
-        "wget https://osf.io/8sm92/download -O ecoli-rel606.fa.gz"
+        "wget https://osf.io/8sm92/download -O {output}"
 
 rule map_reads:
     conda: "env-minimap.yml"
+    input: ref="ecoli-rel606.fa.gz", reads="SRR2584857_1.fastq.gz"
+    output: "SRR2584857_1.ecoli-rel606.sam"
     shell: """
-        minimap2 -ax sr ecoli-rel606.fa.gz SRR2584857_1.fastq.gz > SRR2584857_1.ecoli-rel606.sam
+        minimap2 -ax sr {input.ref} {input.reads} > {output}
     """
 
 rule sam_to_bam:
     conda: "env-minimap.yml"
+    input: "SRR2584857_1.ecoli-rel606.sam"
+    output: "SRR2584857_1.ecoli-rel606.bam"
     shell: """
-        samtools view -b -F 4 SRR2584857_1.ecoli-rel606.sam > SRR2584857_1.ecoli-rel606.bam
+        samtools view -b -F 4 {input} > {output}
      """
 
 rule sort_bam:
     conda: "env-minimap.yml"
+    input: "SRR2584857_1.ecoli-rel606.bam"
+    output: "SRR2584857_1.ecoli-rel606.bam.sorted"
     shell: """
-        samtools sort SRR2584857_1.ecoli-rel606.bam > SRR2584857_1.ecoli-rel606.bam.sorted
+        samtools sort {input} > {output}
     """
 
 rule call_variants:
     conda: "env-bcftools.yml"
+    input:
+        ref="ecoli-rel606.fa.gz",
+        bamsort="SRR2584857_1.ecoli-rel606.bam.sorted"
+    output:
+        refout="ecoli-rel606.fa",
+        pileup="SRR2584857_1.ecoli-rel606.pileup",
+        bcf="SRR2584857_1.ecoli-rel606.bcf",
+        vcf="SRR2584857_1.ecoli-rel606.vcf"
     shell: """
-        gunzip -c ecoli-rel606.fa.gz > ecoli-rel606.fa
-        bcftools mpileup -Ou -f ecoli-rel606.fa SRR2584857_1.ecoli-rel606.bam.sorted > SRR2584857_1.ecoli-rel606.pileup
-        bcftools call -mv -Ob SRR2584857_1.ecoli-rel606.pileup -o SRR2584857_1.ecoli-rel606.bcf
-        bcftools view SRR2584857_1.ecoli-rel606.bcf > SRR2584857_1.ecoli-rel606.vcf
+        gunzip -c {input.ref} > {output.refout}
+        bcftools mpileup -Ou -f {output.refout} {input.bamsort} > {output.pileup}
+        bcftools call -mv -Ob {output.pileup} -o {output.bcf}
+        bcftools view {output.bcf} > {output.vcf}
     """
